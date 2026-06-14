@@ -29,3 +29,26 @@ exports.login = async (username, password) => {
   return { token }
 }
 
+exports.register = async ({ username, password, role = 'user' }) => {
+  if (!username || !password) {
+    throw new AppError('USERNAME_PASSWORD_REQUIRED', 400)
+  }
+
+  const existing = await userModel.findByUsername(username)
+  if (existing) {
+    throw new AppError('USERNAME_ALREADY_EXISTS', 409)
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10)
+  const newUser = {
+    id: require('uuid').v4(),
+    username,
+    password: hashedPassword,
+    role
+  }
+
+  await userModel.create(newUser)
+  const created = await userModel.findById(newUser.id)
+  return created
+}
+

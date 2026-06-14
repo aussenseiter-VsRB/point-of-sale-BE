@@ -8,7 +8,17 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+    timezone: '+00:00',
+    dateStrings: false
+})
+
+pool.on('connection', (connection) => {
+    connection.query(`
+        SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';
+    `)
 })
 
 module.exports = pool

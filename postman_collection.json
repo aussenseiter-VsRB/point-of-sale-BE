@@ -1,0 +1,848 @@
+{
+  "info": {
+    "name": "POS Backend API",
+    "description": "Point of Sale Backend System\n\n## Authentication\n- `POST /auth/login` is public.\n- `POST /auth/register` requires ADMIN token.\n- All other endpoints require `Authorization: Bearer <token>` header.\n- Token expires in 1 hour.\n\n## Role-Based Access\n| Role    | Permissions |\n|---------|-------------|\n| `admin` | Full access to everything |\n| `user`  | Read produk, create transactions, restock (stok-masuk), open/close shifts, reconciliation |\n\n## New Features\n- **Shift system**: Track kasir work shifts (open/close)\n- **Cash reconciliation**: At shift close, declare actual cash vs expected\n- **Void log**: Audit trail for deleted transactions\n- **Discount tracking**: Apply discounts with approval for >10%",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('token', jsonData.token);",
+                  "    pm.test('Login success - token saved', () => {",
+                  "        pm.response.to.have.status(200);",
+                  "        pm.expect(jsonData.token).to.not.be.empty;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"050208\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login with credentials. Returns JWT token which is auto-saved to collection variable `token`. Default admin: admin / 050208"
+          }
+        },
+        {
+          "name": "Register [ADMIN]",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"kasir3\",\n  \"password\": \"password123\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Register a new user. REQUIRES ADMIN token. Role: 'admin' or 'user' (kasir)."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "" },
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Logout. Client-side token discard (stateless JWT)."
+          }
+        }
+      ],
+      "description": "Authentication endpoints."
+    },
+    {
+      "name": "Users [ADMIN]",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            },
+            "description": "Get all registered users. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{user_id}}"]
+            },
+            "description": "Get a single user by ID. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{user_id}}"]
+            },
+            "description": "Delete a user (hard delete). ADMIN ONLY."
+          }
+        }
+      ],
+      "description": "User management. ADMIN ONLY."
+    },
+    {
+      "name": "Produk (Products)",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/produk",
+              "host": ["{{base_url}}"],
+              "path": ["produk"]
+            },
+            "description": "Get all products (not soft-deleted). Accessible by all authenticated users."
+          }
+        },
+        {
+          "name": "Get Product By Barcode",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/produk/barcode/{{barcode}}",
+              "host": ["{{base_url}}"],
+              "path": ["produk", "barcode", "{{barcode}}"]
+            },
+            "description": "Get product by barcode. Useful for POS scanner."
+          }
+        },
+        {
+          "name": "Get Product By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/produk/{{produk_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["produk", "{{produk_id}}"]
+            },
+            "description": "Get product by UUID."
+          }
+        },
+        {
+          "name": "Create Product [ADMIN]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('produk_id', jsonData.id);",
+                  "    pm.collectionVariables.set('barcode', jsonData.barcode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_produk\": \"Mie Sedap\",\n  \"harga\": 3500,\n  \"stok\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produk",
+              "host": ["{{base_url}}"],
+              "path": ["produk"]
+            },
+            "description": "Create a new product. Barcode is auto-generated (EAN-13 with 899 Indonesia prefix). ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Update Product [ADMIN]",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nama_produk\": \"Mie Sedap Goreng\",\n  \"harga\": 3800\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produk/{{produk_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["produk", "{{produk_id}}"]
+            },
+            "description": "Update product. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Delete Product [ADMIN]",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/produk/{{produk_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["produk", "{{produk_id}}"]
+            },
+            "description": "Soft-delete a product. ADMIN ONLY."
+          }
+        }
+      ],
+      "description": "Product management. Read = all users, Write = admin only."
+    },
+    {
+      "name": "Kasir (Cashiers)",
+      "item": [
+        {
+          "name": "Get All Cashiers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/kasir",
+              "host": ["{{base_url}}"],
+              "path": ["kasir"]
+            },
+            "description": "Get all cashiers with linked username. Accessible by all."
+          }
+        },
+        {
+          "name": "Get Cashier By User ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/kasir/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["kasir", "user", "{{user_id}}"]
+            },
+            "description": "Get cashier record by user UUID."
+          }
+        },
+        {
+          "name": "Get Cashier By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/kasir/{{kasir_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["kasir", "{{kasir_id}}"]
+            },
+            "description": "Get cashier by ID."
+          }
+        },
+        {
+          "name": "Create Cashier [ADMIN]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('kasir_id', jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"modal\": 500000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/kasir",
+              "host": ["{{base_url}}"],
+              "path": ["kasir"]
+            },
+            "description": "Create a cashier linked to a user. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Update Cashier Modal [ADMIN]",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modal\": 1000000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/kasir/{{kasir_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["kasir", "{{kasir_id}}"]
+            },
+            "description": "Update cashier's starting cash. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Delete Cashier [ADMIN]",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/kasir/{{kasir_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["kasir", "{{kasir_id}}"]
+            },
+            "description": "Soft-delete a cashier. ADMIN ONLY."
+          }
+        }
+      ],
+      "description": "Cashier management. Read = all users, Write = admin only."
+    },
+    {
+      "name": "Transaksi (Transactions)",
+      "item": [
+        {
+          "name": "Get All Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/transaksi",
+              "host": ["{{base_url}}"],
+              "path": ["transaksi"]
+            },
+            "description": "Get all transactions, newest first."
+          }
+        },
+        {
+          "name": "Get Transactions By Cashier",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/transaksi/kasir/{{kasir_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["transaksi", "kasir", "{{kasir_id}}"]
+            },
+            "description": "Get all transactions for a specific cashier."
+          }
+        },
+        {
+          "name": "Get Transaction By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/transaksi/{{transaksi_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["transaksi", "{{transaksi_id}}"]
+            },
+            "description": "Get a single transaction with all line items."
+          }
+        },
+        {
+          "name": "Create Transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('transaksi_id', jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_kasir\": {{kasir_id}},\n  \"items\": [\n    {\n      \"id_produk\": \"{{produk_id}}\",\n      \"jumlah\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/transaksi",
+              "host": ["{{base_url}}"],
+              "path": ["transaksi"]
+            },
+            "description": "Create a sale transaction. Validates stock availability, then DECREMENTS product stock.\n\nNote: Use id_produk (UUID) for each item. If using barcode scanner, first GET /produk/barcode/:code to get the produk_id.\n\nOptional discount fields: discount_amount, discount_reason, discount_approved_by (required if discount > 10% of subtotal)."
+          }
+        },
+        {
+          "name": "Create Transaction with Discount",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_kasir\": {{kasir_id}},\n  \"items\": [\n    {\n      \"id_produk\": \"{{produk_id}}\",\n      \"jumlah\": 2\n    }\n  ],\n  \"discount_amount\": 1000,\n  \"discount_reason\": \"Promo weekend\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/transaksi",
+              "host": ["{{base_url}}"],
+              "path": ["transaksi"]
+            },
+            "description": "Create transaction with discount. Discount ≤10% of subtotal = auto-approved. Discount >10% requires discount_approved_by (admin UUID)."
+          }
+        },
+        {
+          "name": "Soft-Delete Transaction (Void)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Customer returned items\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/transaksi/{{transaksi_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["transaksi", "{{transaksi_id}}"]
+            },
+            "description": "Soft-delete (void) a transaction. Accepts JSON body with 'reason' (required). Creates a void_log entry before deleting. Reason must not be empty."
+          }
+        },
+        {
+          "name": "Get Discounted Transactions [ADMIN]",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/transaksi/discounted",
+              "host": ["{{base_url}}"],
+              "path": ["transaksi", "discounted"]
+            },
+            "description": "List all transactions where discount_amount > 0, ordered by discount_amount DESC. ADMIN ONLY."
+          }
+        }
+      ],
+      "description": "Transaction/Sale management. Accessible by all authenticated users (admin + kasir)."
+    },
+    {
+      "name": "Stok Masuk (Restock)",
+      "item": [
+        {
+          "name": "Get All Restock History",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/stok-masuk",
+              "host": ["{{base_url}}"],
+              "path": ["stok-masuk"]
+            },
+            "description": "Get all stock intake/restock records with product info and who recorded it."
+          }
+        },
+        {
+          "name": "Get Restock By Product",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/stok-masuk/produk/{{produk_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["stok-masuk", "produk", "{{produk_id}}"]
+            },
+            "description": "Get restock history for a specific product."
+          }
+        },
+        {
+          "name": "Create Restock",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_produk\": \"{{produk_id}}\",\n  \"jumlah_beli\": 5,\n  \"jumlah_satuan\": 24,\n  \"harga_beli\": 2500,\n  \"supplier\": \"PT Indofood\",\n  \"keterangan\": \"Restock bulanan\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/stok-masuk",
+              "host": ["{{base_url}}"],
+              "path": ["stok-masuk"]
+            },
+            "description": "Record stock intake. Automatically INCREMENTS product stock.\n\n- jumlah_beli = how many boxes/units purchased\n- jumlah_satuan = items per box (e.g., 24 pcs per box) → defaults to 1\n- Total stock added: jumlah_beli * jumlah_satuan\n- id_user (who did it) is auto-taken from JWT token\n\nFor Excel-based bulk restock: Frontend parses Excel, then POST one-by-one or in batch."
+          }
+        }
+      ],
+      "description": "Restock / Stock Intake. Records inventory purchases and auto-updates produk.stok. Accessible by all authenticated users."
+    },
+    {
+      "name": "Reports [ADMIN]",
+      "item": [
+        {
+          "name": "Daily Item Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/report/daily/{{kasir_id}}?date=2026-05-25",
+              "host": ["{{base_url}}"],
+              "path": ["report", "daily", "{{kasir_id}}"],
+              "query": [
+                { "key": "date", "value": "2026-05-25" }
+              ]
+            },
+            "description": "Daily item-level sales report. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Daily Profit Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/report/daily-profit/{{kasir_id}}?date=2026-05-25",
+              "host": ["{{base_url}}"],
+              "path": ["report", "daily-profit", "{{kasir_id}}"],
+              "query": [
+                { "key": "date", "value": "2026-05-25" }
+              ]
+            },
+            "description": "Daily profit summary. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Monthly Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/report/monthly/{{kasir_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["report", "monthly", "{{kasir_id}}"]
+            },
+            "description": "Monthly report (last 30 days). ADMIN ONLY."
+          }
+        }
+      ],
+      "description": "Reporting endpoints. ADMIN ONLY."
+    },
+    {
+      "name": "Shift",
+      "item": [
+        {
+          "name": "Open Shift",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('shift_id', jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shift/open",
+              "host": ["{{base_url}}"],
+              "path": ["shift", "open"]
+            },
+            "description": "Open a new shift for the authenticated kasir. Finds the kasir record from the JWT user. Returns 409 if kasir already has an open shift."
+          }
+        },
+        {
+          "name": "Close Shift",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shift/close/{{shift_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["shift", "close", "{{shift_id}}"]
+            },
+            "description": "Close a shift. Only the kasir who opened it can close, unless the requester is admin. Returns 400 if already closed."
+          }
+        },
+        {
+          "name": "Get All Shifts [ADMIN]",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shift",
+              "host": ["{{base_url}}"],
+              "path": ["shift"]
+            },
+            "description": "List all shifts with kasir and user info. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Get Shifts By Cashier",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/shift/kasir/{{kasir_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["shift", "kasir", "{{kasir_id}}"]
+            },
+            "description": "List all shifts for a specific cashier."
+          }
+        }
+      ],
+      "description": "Work shift tracking. Open/close shifts for cashiers."
+    },
+    {
+      "name": "Cash Reconciliation",
+      "item": [
+        {
+          "name": "Submit Reconciliation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shift_id\": \"{{shift_id}}\",\n  \"actual_cash\": 150000,\n  \"note\": \"Cash drawer count at end of shift\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/reconciliation",
+              "host": ["{{base_url}}"],
+              "path": ["reconciliation"]
+            },
+            "description": "Submit cash reconciliation for a shift. Server computes expected_cash from SUM of transaction totals and discrepancy. Auto-closes the shift if still open. Returns 409 if shift already reconciled."
+          }
+        },
+        {
+          "name": "Get All Reconciliations [ADMIN]",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reconciliation",
+              "host": ["{{base_url}}"],
+              "path": ["reconciliation"]
+            },
+            "description": "List all cash reconciliations. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Get Reconciliation By Shift [ADMIN]",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reconciliation/shift/{{shift_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["reconciliation", "shift", "{{shift_id}}"]
+            },
+            "description": "Get reconciliation for a specific shift. ADMIN ONLY."
+          }
+        }
+      ],
+      "description": "Cash reconciliation at shift close. Kasir declares actual cash, system computes expected vs discrepancy."
+    },
+    {
+      "name": "Void Log [ADMIN]",
+      "item": [
+        {
+          "name": "Get All Void Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/void-log",
+              "host": ["{{base_url}}"],
+              "path": ["void-log"]
+            },
+            "description": "List all void logs with transaction info and who voided. ADMIN ONLY."
+          }
+        },
+        {
+          "name": "Get Void Log By Transaction",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/void-log/transaksi/{{transaksi_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["void-log", "transaksi", "{{transaksi_id}}"]
+            },
+            "description": "Get void log for a specific transaction. ADMIN ONLY."
+          }
+        }
+      ],
+      "description": "Transaction void audit log. Tracks who voided a transaction and why."
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "produk_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "barcode",
+      "value": "8991234567890",
+      "type": "string"
+    },
+    {
+      "key": "kasir_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transaksi_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "shift_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

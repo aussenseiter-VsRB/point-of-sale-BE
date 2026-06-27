@@ -20,10 +20,12 @@ exports.findById = async (id) => {
   const [rows] = await db.query(
     `SELECT t.id, t.invoice_number, t.total_harga, t.created_at,
             t.discount_amount, t.discount_reason, t.discount_approved_by,
+            t.coupon_id, c.code AS coupon_code,
             users.username AS nama_kasir
      FROM transaksi t
      JOIN kasir k ON k.id = t.id_kasir
      JOIN users ON users.id = k.user_id
+     LEFT JOIN coupons c ON c.id = t.coupon_id
      WHERE t.id = ? AND t.deleted_at IS NULL`,
     [id]
   )
@@ -63,12 +65,12 @@ exports.findWithItems = async (id) => {
   return rows
 }
 
-exports.create = async (id_kasir, total_harga, discount_amount, discount_reason, discount_approved_by) => {
+exports.create = async (id_kasir, total_harga, discount_amount, discount_reason, discount_approved_by, shift_id, coupon_id) => {
   const id = uuidv4()
   await db.query(
-    `INSERT INTO transaksi (id, id_kasir, total_harga, discount_amount, discount_reason, discount_approved_by)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, id_kasir, total_harga, discount_amount || 0, discount_reason || null, discount_approved_by || null]
+    `INSERT INTO transaksi (id, id_kasir, total_harga, discount_amount, discount_reason, discount_approved_by, shift_id, coupon_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, id_kasir, total_harga, discount_amount || 0, discount_reason || null, discount_approved_by || null, shift_id || null, coupon_id || null]
   )
   return exports.findById(id)
 }

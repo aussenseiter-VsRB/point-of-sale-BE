@@ -4,7 +4,9 @@ const itemTransaksiModel = require('../models/itemTransaksi.model')
 const produkModel = require('../models/produk.models')
 const kasirModel = require('../models/kasir.model')
 const userModel = require('../models/user.model')
+const shiftModel = require('../models/shift.model')
 const voidLogModel = require('../models/voidLog.model')
+const couponModel = require('../models/coupon.model')
 
 exports.getAll = async () => {
   return await transaksiModel.findAll()
@@ -32,13 +34,16 @@ function generateInvoiceNumber() {
   return { dateStr, prefix: `INV-${dateStr}-` }
 }
 
-exports.create = async (id_kasir, items, discount_amount, discount_reason, discount_approved_by) => {
+exports.create = async (id_kasir, items, discount_amount, discount_reason, discount_approved_by, coupon_code) => {
   if (!id_kasir || !Array.isArray(items) || items.length === 0) {
     throw new AppError('INVALID_PAYLOAD', 400)
   }
 
   const kasir = await kasirModel.findById(id_kasir)
   if (!kasir) throw new AppError('KASIR_NOT_FOUND', 404)
+
+  const openShift = await shiftModel.findOpenByKasir(id_kasir)
+  if (!openShift) throw new AppError('NO_OPEN_SHIFT', 403)
 
   let subtotal = 0
 
@@ -51,29 +56,32 @@ exports.create = async (id_kasir, items, discount_amount, discount_reason, disco
     subtotal += Number(produk.harga) * Number(item.jumlah)
   }
 
-  const discAmount = Number(discount_amount) || 0
+  let coupon_id = null
+  let discAmount = Number(discount_amount) || 0
+  let discReason = discount_reason || null
+
+  if (coupon_code) {
+    const coupon = await couponModel.findByCode(coupon_code.trim())
+    if (!coupon) throw new AppError('COUPON_NOT_FOUND', 404)
+    if (!coupon.is_active) throw new AppError('COUPON_INACTIVE', 400)
+    if (Number(coupon.discount_amount) > subtotal) {
+      throw new AppError('DISCOUNT_EXCEEDS_SUBTOTAL', 400)
+    }
+    discAmount = Number(coupon.discount_amount)
+    discReason = coupon.description || `Coupon: ${coupon.code}`
+    coupon_id = coupon.id
+  }
+
   let total_harga = subtotal
 
   if (discAmount > 0) {
     if (discAmount > subtotal) {
       throw new AppError('DISCOUNT_EXCEEDS_SUBTOTAL', 400)
     }
-
-    const tenPercent = subtotal * 0.1
-    if (discAmount > tenPercent) {
-      if (!discount_approved_by) {
-        throw new AppError('DISCOUNT_APPROVAL_REQUIRED', 403)
-      }
-      const approver = await userModel.findById(discount_approved_by)
-      if (!approver || approver.role !== 'admin') {
-        throw new AppError('INVALID_APPROVER', 403)
-      }
-    }
-
     total_harga = subtotal - discAmount
   }
 
-  const transaksi = await transaksiModel.create(id_kasir, total_harga, discAmount, discount_reason || null, discount_approved_by || null)
+  const transaksi = await transaksiModel.create(id_kasir, total_harga, discAmount, discReason, discount_approved_by || null, openShift.id, coupon_id)
 
   const { dateStr, prefix } = generateInvoiceNumber()
   const lastInvoice = await transaksiModel.getLastInvoiceNumberToday()

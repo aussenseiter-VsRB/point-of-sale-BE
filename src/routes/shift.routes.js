@@ -6,6 +6,7 @@ const roleMiddleware = require('../middlewares/role.middleware')
 
 router.post('/open', authMiddleware, shiftController.open)
 router.post('/close/:id', authMiddleware, shiftController.close)
+router.get('/my-open', authMiddleware, shiftController.getMyOpen)
 router.get('/', authMiddleware, roleMiddleware('admin'), shiftController.getAll)
 router.get('/kasir/:kasirId', authMiddleware, shiftController.getByKasir)
 

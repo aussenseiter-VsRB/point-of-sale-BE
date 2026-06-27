@@ -16,6 +16,11 @@ exports.getAll = asyncHandler(async (req, res) => {
   res.json(shifts)
 })
 
+exports.getMyOpen = asyncHandler(async (req, res) => {
+  const shift = await shiftService.getMyOpenShift(req.user.id)
+  res.json(shift)
+})
+
 exports.getByKasir = asyncHandler(async (req, res) => {
   const shifts = await shiftService.getShiftsByKasir(req.params.kasirId)
   res.json(shifts)

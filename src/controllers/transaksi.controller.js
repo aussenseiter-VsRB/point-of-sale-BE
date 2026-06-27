@@ -17,8 +17,8 @@ exports.getByKasir = asyncHandler(async (req, res) => {
 })
 
 exports.create = asyncHandler(async (req, res) => {
-  const { id_kasir, items, discount_amount, discount_reason, discount_approved_by } = req.body
-  const data = await transaksiService.create(id_kasir, items, discount_amount, discount_reason, discount_approved_by)
+  const { id_kasir, items, discount_amount, discount_reason, discount_approved_by, coupon_code } = req.body
+  const data = await transaksiService.create(id_kasir, items, discount_amount, discount_reason, discount_approved_by, coupon_code)
   res.status(201).json(data)
 })
 

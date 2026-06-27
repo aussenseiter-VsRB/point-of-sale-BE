@@ -25,6 +25,12 @@ exports.closeShift = async (id, userId, userRole) => {
   return await shiftModel.close(id)
 }
 
+exports.getMyOpenShift = async (userId) => {
+  const kasir = await kasirModel.findByUserId(userId)
+  if (!kasir) return null
+  return await shiftModel.findOpenByKasir(kasir.id)
+}
+
 exports.getAllShifts = async () => {
   return await shiftModel.findAll()
 }

@@ -43,8 +43,13 @@ exports.submit = async (shiftId, actualCash, note, userId, userRole) => {
   return data
 }
 
-exports.getAll = async () => {
-  return await cashReconciliationModel.findAll()
+exports.getAll = async (userId, userRole) => {
+  if (userRole === 'admin') {
+    return await cashReconciliationModel.findAll()
+  }
+  const kasir = await kasirModel.findByUserId(userId)
+  if (!kasir) return []
+  return await cashReconciliationModel.findByKasir(kasir.id)
 }
 
 exports.getByShift = async (shiftId) => {

@@ -8,7 +8,7 @@ exports.submit = asyncHandler(async (req, res) => {
 })
 
 exports.getAll = asyncHandler(async (req, res) => {
-  const data = await cashReconciliationService.getAll()
+  const data = await cashReconciliationService.getAll(req.user.id, req.user.role)
   res.json(data)
 })
 

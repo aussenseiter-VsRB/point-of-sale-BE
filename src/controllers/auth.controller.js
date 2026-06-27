@@ -7,7 +7,8 @@ exports.login = asyncHandler(async (req, res) => {
 
   res.json({
     message: 'login success',
-    token: result.token
+    token: result.token,
+    user: result.user
   })
 })
 
@@ -22,6 +23,12 @@ exports.register = asyncHandler(async (req, res) => {
       role: user.role
     }
   })
+})
+
+exports.resetPassword = asyncHandler(async (req, res) => {
+  const { username, current_password, new_password } = req.body
+  const user = await authService.resetPassword(username, current_password, new_password)
+  res.json({ message: 'Password reset successfully', user })
 })
 
 exports.logout = asyncHandler(async (req, res) => {

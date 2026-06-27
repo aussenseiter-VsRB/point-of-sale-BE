@@ -23,6 +23,15 @@ exports.getByKasir = async (id_kasir) => {
   return await transaksiModel.findByKasir(id_kasir)
 }
 
+function generateInvoiceNumber() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const dateStr = `${year}${month}${day}`
+  return { dateStr, prefix: `INV-${dateStr}-` }
+}
+
 exports.create = async (id_kasir, items, discount_amount, discount_reason, discount_approved_by) => {
   if (!id_kasir || !Array.isArray(items) || items.length === 0) {
     throw new AppError('INVALID_PAYLOAD', 400)
@@ -65,6 +74,15 @@ exports.create = async (id_kasir, items, discount_amount, discount_reason, disco
   }
 
   const transaksi = await transaksiModel.create(id_kasir, total_harga, discAmount, discount_reason || null, discount_approved_by || null)
+
+  const { dateStr, prefix } = generateInvoiceNumber()
+  const lastInvoice = await transaksiModel.getLastInvoiceNumberToday()
+  let seq = 1
+  if (lastInvoice && lastInvoice.startsWith(prefix)) {
+    seq = parseInt(lastInvoice.slice(prefix.length), 10) + 1
+  }
+  const invoice_number = `${prefix}${String(seq).padStart(4, '0')}`
+  await transaksiModel.updateInvoiceNumber(transaksi.id, invoice_number)
 
   for (const item of items) {
     const produk = await produkModel.findById(item.id_produk)

@@ -23,6 +23,18 @@ exports.findByShift = async (shiftId) => {
   return rows[0] || null
 }
 
+exports.findByKasir = async (kasirId) => {
+  const [rows] = await db.query(`
+    SELECT cr.*, u.username AS kasir_username
+    FROM cash_reconciliation cr
+    JOIN kasir k ON k.id = cr.kasir_id
+    JOIN users u ON u.id = k.user_id
+    WHERE cr.kasir_id = ?
+    ORDER BY cr.created_at DESC
+  `, [kasirId])
+  return rows
+}
+
 exports.create = async (data) => {
   const { shift_id, kasir_id, expected_cash, actual_cash, discrepancy, note } = data
   const id = uuidv4()

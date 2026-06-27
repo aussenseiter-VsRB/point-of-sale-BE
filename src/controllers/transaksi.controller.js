@@ -27,6 +27,11 @@ exports.delete = asyncHandler(async (req, res) => {
   res.json({ message: 'Transaksi deleted' })
 })
 
+exports.getInvoice = asyncHandler(async (req, res) => {
+  const data = await transaksiService.getById(req.params.id)
+  res.json(data)
+})
+
 exports.getDiscounted = asyncHandler(async (req, res) => {
   const data = await transaksiService.getDiscounted()
   res.json(data)

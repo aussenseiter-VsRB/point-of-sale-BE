@@ -17,7 +17,7 @@
 - **Resource-based (MVC)**: every domain entity (users, produk, kasir, transaksi, stok-masuk, report) has its own route → controller → service → model stack, all under `src/`.
 - **Three-layer architecture with utility cross-cutting**: routes wire middleware + controllers; controllers delegate to services; services contain business logic + validation and call models; models are raw SQL queries against the connection pool.
 - **Middleware-driven auth and roles**: `auth.middleware` verifies JWT and injects `req.user`; `role.middleware` is a factory that checks `req.user.role` against allowed roles.
-- **Soft-delete by convention**: all main entities (`users`, `produk`, `kasir`, `transaksi`, `produk_barcode`) use a nullable `deleted_at` timestamp; queries filter `WHERE deleted_at IS NULL`.
+- **Soft-delete by convention**: all main entities (`users`, `produk`, `kasir`, `transaksi`, `produk_barcode`, `shifts`) use a nullable `deleted_at` timestamp; queries filter `WHERE deleted_at IS NULL`.
 - **JWT stateless auth**: no session store; token contains `{ id, role }` with 1-hour expiry.
 - **Error handling**: custom `AppError` class with `statusCode`; global error handler in `app.js` catches `AppError`, `JsonWebTokenError`, and unhandled errors.
 
@@ -54,7 +54,8 @@
 │   ├── 01_users.js               # 3 users: admin, kasir1, kasir2 (pw: 050208)
 │   ├── 02_produk.js              # 10 sample products (Indonesian items)
 │   ├── 03_kasir.js               # 2 cashier records linked to kasir1/kasir2
-│   └── 04_transaksi_sample.js    # 2 sample transactions with line items
+│   ├── 04_transaksi_sample.js    # 2 sample transactions with line items
+│   └── 05_shifts_and_reconciliation.js  # 2 shifts (1 closed with reconciliation, 1 open), links existing transaksi to closed shift
 │
 └── src/
     ├── app.js                    # Express app factory: middleware, route mounts, 404, global error handler
@@ -115,7 +116,7 @@
         ├── user.model.js         # findAll, findById, findByUsername (includes password), create, deleteById
         ├── produk.models.js      # findAll (WHERE deleted_at IS NULL, ORDER BY nama_produk), findById, findByBarcode, create (UUID()), update, updateStok, softDelete
         ├── kasir.model.js        # findAll (JOIN users), findById, findByUserId, create, updateModal, softDelete
-        ├── transaksi.model.js    # findAll (JOIN kasir+users), findById, findByKasir, findWithItems (JOIN items+products), create (UUID), softDelete
+        ├── transaksi.model.js    # findAll (JOIN kasir+users), findById, findByKasir, findWithItems (JOIN items+products), create (UUID), softDelete, sumTotalByShift, findDiscounted
         ├── itemTransaksi.model.js    # findByTransaksi (JOIN produk), create, deleteByTransaksi
         ├── stokMasuk.model.js    # findAll (JOIN produk+users), findByProduk, findById, create (UUID)
         ├── report.model.js       # getDailyItemReport (SUM by product), getDailyProfit, getMonthlyReport (last 30 days)
@@ -257,11 +258,11 @@ This is the single source of truth for URL prefix assignment. No route file deci
 | PUT | `/kasir/:id` | required | admin | `kasirController.update` |
 | DELETE | `/kasir/:id` | required | admin | `kasirController.delete` |
 | GET | `/transaksi` | required | — | `transaksiController.getAll` |
+| GET | `/transaksi/discounted` | required | admin | `transaksiController.getDiscounted` |
 | GET | `/transaksi/kasir/:kasirId` | required | — | `transaksiController.getByKasir` |
 | GET | `/transaksi/:id` | required | — | `transaksiController.getById` |
 | POST | `/transaksi` | required | — | `transaksiController.create` |
-| DELETE | `/transaksi/:id` | required | — | `transaksiController.softDelete` |
-| GET | `/transaksi/discounted` | required | admin | `transaksiController.getDiscounted` |
+| DELETE | `/transaksi/:id` | required | — | `transaksiController.delete` |
 | GET | `/report/daily/:kasirId` | required | admin | `reportController.dailyItem` |
 | GET | `/report/daily-profit/:kasirId` | required | admin | `reportController.dailyProfit` |
 | GET | `/report/monthly/:kasirId` | required | admin | `reportController.monthly` |
@@ -406,11 +407,11 @@ This is the single source of truth for URL prefix assignment. No route file deci
 - **Controllers must not contain business logic**: they parse input, call a service method, and send the response — nothing else.
 - **Services must not send HTTP responses**: they throw `AppError` or return data. Never call `res.` methods in a service.
 - **Models must not throw HTTP errors**: models return data or `null`. Services check `null` and throw `AppError`.
-- **Soft-delete discipline**: all `SELECT` queries on soft-deletable tables must include `AND deleted_at IS NULL`. The `softDelete` methods set `deleted_at = NOW()`, never `DELETE FROM`.
+- **Soft-delete discipline**: all `SELECT` queries on soft-deletable tables (`users`, `produk`, `kasir`, `transaksi`, `produk_barcode`, `shifts`) must include `AND deleted_at IS NULL`. The `softDelete` methods set `deleted_at = NOW()`, never `DELETE FROM`.
 - **No raw SQL in services**: all SQL lives in model files. Services call model functions only.
 - **Async handlers must be wrapped**: every controller/route handler that uses `async` must be wrapped with `asyncHandler` (from `src/utils/asyncHandler.js`), or errors will crash the process.
 - **Every route module follows the same file structure**: `require` dependencies → create router → define routes → `module.exports = router`.
-- **UUID generation**: the `uuid` package is used for primary keys (users, produk, transaksi, item_transaksi, stok_masuk, produk_barcode). The `kasir` table uses auto-increment (`increments('id')`).
+- **UUID generation**: the `uuid` package is used for primary keys (users, produk, transaksi, item_transaksi, stok_masuk, produk_barcode, shifts, cash_reconciliation, void_log). The `kasir` table uses auto-increment (`increments('id')`).
 - **Inconsistency note**: some model files use singular naming (`user.model.js`, `itemTransaksi.model.js`) and others use plural (`produk.models.js`, `stokMasuk.model.js`). Follow the majority pattern for new files — use singular (`*.model.js`).
 - **No test suite**: `npm test` is a placeholder. There are no test files in the project.
 - **Multer and xlsx are installed but unused**: `multer` (file upload) and `xlsx` (Excel export) are in `package.json` dependencies but not imported or used in any route/controller/service/model.

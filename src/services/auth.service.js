@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const AppError = require('../errors/AppError')
 const userModel = require('../models/user.model')
+const passwordHistoryModel = require('../models/passwordHistory.model')
 
 exports.login = async (username, password) => {
   if (!username || !password) {
@@ -26,7 +27,32 @@ exports.login = async (username, password) => {
       { expiresIn: '1h' }
   )
 
-  return { token }
+  return { token, user: { id: user.id, username: user.username, role: user.role } }
+}
+
+exports.resetPassword = async (username, currentPassword, newPassword) => {
+  if (!username || !currentPassword || !newPassword) {
+    throw new AppError('USERNAME_CURRENT_PASSWORD_NEW_PASSWORD_REQUIRED', 400)
+  }
+  if (newPassword.length < 6) {
+    throw new AppError('PASSWORD_MIN_6_CHARACTERS', 400)
+  }
+
+  const user = await userModel.findByUsername(username)
+  if (!user) {
+    throw new AppError('USER_NOT_FOUND', 404)
+  }
+
+  const isMatch = await bcrypt.compare(currentPassword, user.password)
+  if (!isMatch) {
+    throw new AppError('CURRENT_PASSWORD_INCORRECT', 401)
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10)
+  await userModel.updatePassword(user.id, hashedPassword)
+  await passwordHistoryModel.create(user.id, user.id)
+
+  return { id: user.id, username: user.username }
 }
 
 exports.register = async ({ username, password, role = 'user' }) => {

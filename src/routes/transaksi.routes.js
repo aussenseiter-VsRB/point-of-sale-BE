@@ -8,6 +8,7 @@ router.get('/', authMiddleware, transaksiController.getAll)
 router.get('/discounted', authMiddleware, roleMiddleware('admin'), transaksiController.getDiscounted)
 router.get('/kasir/:kasirId', authMiddleware, transaksiController.getByKasir)
 router.get('/:id', authMiddleware, transaksiController.getById)
+router.get('/:id/invoice', authMiddleware, transaksiController.getInvoice)
 router.post('/', authMiddleware, transaksiController.create)
 router.delete('/:id', authMiddleware, transaksiController.delete)
 

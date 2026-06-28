@@ -3,9 +3,10 @@ const db = require('../config/db')
 
 exports.findByTransaksi = async (id_transaksi) => {
   const [rows] = await db.query(
-    `SELECT it.id, it.jumlah, 
-            p.nama_produk, p.barcode, p.harga,
-            (it.jumlah * p.harga) AS subtotal
+    `SELECT it.id, it.jumlah,
+            p.nama_produk, p.barcode, it.harga,
+            p.harga AS original_harga,
+            (it.jumlah * it.harga) AS subtotal
      FROM item_transaksi it
      JOIN produk p ON p.id = it.id_produk
      WHERE it.id_transaksi = ?`,

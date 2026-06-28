@@ -27,6 +27,10 @@ exports.updateKasir = async (id, modal) => {
   return await kasirModel.updateModal(id, modal)
 }
 
+exports.getAllKasirWithSales = async () => {
+  return await kasirModel.findAllWithTodaySales()
+}
+
 exports.deleteKasir = async (id) => {
   const kasir = await kasirModel.findById(id)
   if (!kasir) throw new AppError('KASIR_NOT_FOUND', 404)

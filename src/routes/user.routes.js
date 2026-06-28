@@ -9,6 +9,7 @@ router.get('/', authMiddleware, roleMiddleware('admin'), userController.getAll)
 router.get('/:id', authMiddleware, roleMiddleware('admin'), userController.getById)
 router.delete('/:id', authMiddleware, roleMiddleware('admin'), userController.delete)
 
+router.put('/username', authMiddleware, userController.changeOwnUsername)
 router.put('/password', authMiddleware, userController.changeOwnPassword)
 router.put('/:id/password', authMiddleware, roleMiddleware('admin'), userController.changeUserPassword)
 

@@ -6,6 +6,7 @@ const roleMiddleware = require('../middlewares/role.middleware')
 
 router.post('/', authMiddleware, cashReconciliationController.submit)
 router.get('/', authMiddleware, cashReconciliationController.getAll)
+router.get('/preview/:shiftId', authMiddleware, cashReconciliationController.preview)
 router.get('/shift/:shiftId', authMiddleware, roleMiddleware('admin'), cashReconciliationController.getByShift)
 
 module.exports = router

@@ -26,21 +26,27 @@ exports.findByBarcode = async (barcode) => {
 }
 
 exports.create = async (data) => {
-  const { barcode, nama_produk, harga, stok } = data
+  const { barcode, nama_produk, harga, stok, discount_percent } = data
   await db.query(
-    `INSERT INTO produk (id, barcode, nama_produk, harga, stok) 
-     VALUES (UUID(), ?, ?, ?, ?)`,
-    [barcode, nama_produk, harga, stok]
+    `INSERT INTO produk (id, barcode, nama_produk, harga, stok, discount_percent) 
+     VALUES (UUID(), ?, ?, ?, ?, ?)`,
+    [barcode, nama_produk, harga, stok, discount_percent || 0]
   )
   return exports.findByBarcode(barcode)
 }
 
 exports.update = async (id, data) => {
-  const { barcode, nama_produk, harga } = data
+  const fields = []
+  const values = []
+  if (data.barcode !== undefined) { fields.push('barcode = ?'); values.push(data.barcode) }
+  if (data.nama_produk !== undefined) { fields.push('nama_produk = ?'); values.push(data.nama_produk) }
+  if (data.harga !== undefined) { fields.push('harga = ?'); values.push(data.harga) }
+  if (data.discount_percent !== undefined) { fields.push('discount_percent = ?'); values.push(data.discount_percent) }
+  if (fields.length === 0) return exports.findById(id)
+  values.push(id)
   await db.query(
-    `UPDATE produk SET barcode = ?, nama_produk = ?, harga = ?
-     WHERE id = ? AND deleted_at IS NULL`,
-    [barcode, nama_produk, harga, id]
+    `UPDATE produk SET ${fields.join(', ')} WHERE id = ? AND deleted_at IS NULL`,
+    values
   )
   return exports.findById(id)
 }

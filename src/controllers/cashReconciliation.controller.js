@@ -12,6 +12,11 @@ exports.getAll = asyncHandler(async (req, res) => {
   res.json(data)
 })
 
+exports.preview = asyncHandler(async (req, res) => {
+  const data = await cashReconciliationService.getPreview(req.params.shiftId)
+  res.json(data)
+})
+
 exports.getByShift = asyncHandler(async (req, res) => {
   const data = await cashReconciliationService.getByShift(req.params.shiftId)
   res.json(data)

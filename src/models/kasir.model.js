@@ -49,6 +49,22 @@ exports.updateModal = async (id, modal) => {
   return exports.findById(id)
 }
 
+exports.findAllWithTodaySales = async () => {
+  const [rows] = await db.query(
+    `SELECT k.id, k.modal, k.created_at,
+            users.username, users.role,
+            COALESCE(SUM(t.total_harga), 0) AS today_sales
+     FROM kasir k
+     JOIN users ON k.user_id = users.id
+     LEFT JOIN transaksi t ON t.id_kasir = k.id
+        AND t.deleted_at IS NULL
+        AND DATE(t.created_at) = CURDATE()
+     WHERE k.deleted_at IS NULL
+     GROUP BY k.id, users.username, users.role, k.modal, k.created_at`
+  )
+  return rows
+}
+
 exports.softDelete = async (id) => {
   await db.query(
     `UPDATE kasir SET deleted_at = NOW() WHERE id = ?`,

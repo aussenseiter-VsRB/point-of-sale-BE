@@ -45,7 +45,9 @@ exports.create = async (id_kasir, items, discount_amount, discount_reason, disco
   const openShift = await shiftModel.findOpenByKasir(id_kasir)
   if (!openShift) throw new AppError('NO_OPEN_SHIFT', 403)
 
-  let subtotal = 0
+  const itemDetails = []
+  let originalSubtotal = 0
+  let discountedSubtotal = 0
 
   for (const item of items) {
     const produk = await produkModel.findById(item.id_produk)
@@ -53,7 +55,15 @@ exports.create = async (id_kasir, items, discount_amount, discount_reason, disco
     if (produk.stok < item.jumlah) {
       throw new AppError(`INSUFFICIENT_STOCK for ${produk.nama_produk}`, 400)
     }
-    subtotal += Number(produk.harga) * Number(item.jumlah)
+    const qty = Number(item.jumlah)
+    const origPrice = Number(produk.harga)
+    const discPct = (item.discount_percent !== undefined ? Number(item.discount_percent) : Number(produk.discount_percent)) || 0
+    const chargedPrice = discPct > 0 ? origPrice * (1 - discPct / 100) : origPrice
+    const itemOrig = origPrice * qty
+    const itemDiscounted = chargedPrice * qty
+    originalSubtotal += itemOrig
+    discountedSubtotal += itemDiscounted
+    itemDetails.push({ ...item, chargedPrice, discountPercent: discPct })
   }
 
   let coupon_id = null
@@ -64,7 +74,7 @@ exports.create = async (id_kasir, items, discount_amount, discount_reason, disco
     const coupon = await couponModel.findByCode(coupon_code.trim())
     if (!coupon) throw new AppError('COUPON_NOT_FOUND', 404)
     if (!coupon.is_active) throw new AppError('COUPON_INACTIVE', 400)
-    if (Number(coupon.discount_amount) > subtotal) {
+    if (Number(coupon.discount_amount) > discountedSubtotal) {
       throw new AppError('DISCOUNT_EXCEEDS_SUBTOTAL', 400)
     }
     discAmount = Number(coupon.discount_amount)
@@ -72,16 +82,21 @@ exports.create = async (id_kasir, items, discount_amount, discount_reason, disco
     coupon_id = coupon.id
   }
 
-  let total_harga = subtotal
+  let total_harga = discountedSubtotal
+  let totalProductDiscount = originalSubtotal - discountedSubtotal
 
   if (discAmount > 0) {
-    if (discAmount > subtotal) {
+    if (discAmount > discountedSubtotal) {
       throw new AppError('DISCOUNT_EXCEEDS_SUBTOTAL', 400)
     }
-    total_harga = subtotal - discAmount
+    total_harga = discountedSubtotal - discAmount
   }
 
-  const transaksi = await transaksiModel.create(id_kasir, total_harga, discAmount, discReason, discount_approved_by || null, openShift.id, coupon_id)
+  const combinedDiscountAmount = totalProductDiscount + (discAmount || 0)
+  const combinedDiscountReason = []
+  if (totalProductDiscount > 0) combinedDiscountReason.push(`Diskon produk: Rp ${totalProductDiscount.toLocaleString('id-ID')}`)
+  if (discAmount > 0) combinedDiscountReason.push(discReason)
+  const transaksi = await transaksiModel.create(id_kasir, total_harga, combinedDiscountAmount, combinedDiscountReason.join('; ') || null, discount_approved_by || null, openShift.id, coupon_id)
 
   const { dateStr, prefix } = generateInvoiceNumber()
   const lastInvoice = await transaksiModel.getLastInvoiceNumberToday()
@@ -92,9 +107,9 @@ exports.create = async (id_kasir, items, discount_amount, discount_reason, disco
   const invoice_number = `${prefix}${String(seq).padStart(4, '0')}`
   await transaksiModel.updateInvoiceNumber(transaksi.id, invoice_number)
 
-  for (const item of items) {
+  for (const item of itemDetails) {
     const produk = await produkModel.findById(item.id_produk)
-    await itemTransaksiModel.create(transaksi.id, item.id_produk, item.jumlah, produk.harga)
+    await itemTransaksiModel.create(transaksi.id, item.id_produk, item.jumlah, item.chargedPrice)
     await produkModel.updateStok(item.id_produk, produk.stok - item.jumlah)
   }
 

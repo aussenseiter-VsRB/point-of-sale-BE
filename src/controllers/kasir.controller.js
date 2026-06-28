@@ -26,6 +26,11 @@ exports.update = asyncHandler(async (req, res) => {
   res.json(kasir)
 })
 
+exports.getAllWithSales = asyncHandler(async (req, res) => {
+  const data = await kasirService.getAllKasirWithSales()
+  res.json(data)
+})
+
 exports.delete = asyncHandler(async (req, res) => {
   await kasirService.deleteKasir(req.params.id)
   res.json({ message: 'Kasir deleted' })

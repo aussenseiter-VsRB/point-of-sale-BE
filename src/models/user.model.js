@@ -33,10 +33,17 @@ exports.updatePassword = async (id, hashedPassword) => {
     )
 }
 
-exports.deleteById = async (id) => {
+exports.softDelete = async (id) => {
     await db.query(
-        'DELETE FROM users WHERE id = ?',
+        'UPDATE users SET deleted_at = NOW() WHERE id = ?',
         [id]
+    )
+}
+
+exports.updateUsername = async (id, username) => {
+    await db.query(
+        'UPDATE users SET username = ? WHERE id = ?',
+        [username, id]
     )
 }
 

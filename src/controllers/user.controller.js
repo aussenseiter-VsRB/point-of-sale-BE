@@ -27,3 +27,9 @@ exports.changeUserPassword = asyncHandler(async (req, res) => {
   await userService.changeUserPassword(req.user.id, req.params.id, new_password)
   res.json({ message: 'Password changed' })
 })
+
+exports.changeOwnUsername = asyncHandler(async (req, res) => {
+  const { username } = req.body
+  await userService.changeOwnUsername(req.user.id, username)
+  res.json({ message: 'Username changed' })
+})

@@ -16,7 +16,18 @@ exports.getUserById = async (id) => {
 exports.deleteUser = async (id) => {
   const user = await userModel.findById(id)
   if (!user) throw new AppError('USER_NOT_FOUND', 404)
-  await userModel.deleteById(id)
+  await userModel.softDelete(id)
+}
+
+exports.changeOwnUsername = async (userId, newUsername) => {
+  if (!newUsername || newUsername.trim().length === 0) {
+    throw new AppError('USERNAME_REQUIRED', 400)
+  }
+  const existing = await userModel.findByUsername(newUsername.trim())
+  if (existing && existing.id !== userId) {
+    throw new AppError('USERNAME_ALREADY_EXISTS', 409)
+  }
+  await userModel.updateUsername(userId, newUsername.trim())
 }
 
 exports.changeOwnPassword = async (userId, currentPassword, newPassword) => {

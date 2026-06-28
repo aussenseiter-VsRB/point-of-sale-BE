@@ -6,6 +6,7 @@ const authMiddleware = require('../middlewares/auth.middleware')
 const roleMiddleware = require('../middlewares/role.middleware')
 
 router.get('/', authMiddleware, kasirController.getAll)
+router.get('/with-sales', authMiddleware, kasirController.getAllWithSales)
 router.get('/user/:user_id', authMiddleware, kasirController.getByUser)
 router.get('/:id', authMiddleware, kasirController.getById)
 router.post('/', authMiddleware, roleMiddleware('admin'), kasirController.create)

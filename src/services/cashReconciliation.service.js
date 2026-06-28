@@ -23,7 +23,10 @@ exports.submit = async (shiftId, actualCash, note, userId, userRole) => {
   if (existing) throw new AppError('RECONCILIATION_ALREADY_EXISTS', 409)
 
   const totalRow = await transaksiModel.sumTotalByShift(shiftId)
-  const expectedCash = totalRow ? Number(totalRow.total) : 0
+  const totalSales = totalRow ? Number(totalRow.total) : 0
+  const kasirRecord = await kasirModel.findById(shift.kasir_id)
+  const modal = kasirRecord ? Number(kasirRecord.modal) : 0
+  const expectedCash = modal + totalSales
   const actualCashNum = Number(actualCash)
   const discrepancy = actualCashNum - expectedCash
 
@@ -38,6 +41,7 @@ exports.submit = async (shiftId, actualCash, note, userId, userRole) => {
 
   if (shift.status === 'open') {
     await shiftModel.close(shiftId)
+    await kasirModel.updateModal(shift.kasir_id, 0)
   }
 
   return data
@@ -50,6 +54,24 @@ exports.getAll = async (userId, userRole) => {
   const kasir = await kasirModel.findByUserId(userId)
   if (!kasir) return []
   return await cashReconciliationModel.findByKasir(kasir.id)
+}
+
+exports.getPreview = async (shiftId) => {
+  const shift = await shiftModel.findById(shiftId)
+  if (!shift) throw new AppError('SHIFT_NOT_FOUND', 404)
+
+  const totalRow = await transaksiModel.sumTotalByShift(shiftId)
+  const totalSales = totalRow ? Number(totalRow.total) : 0
+  const kasirRecord = await kasirModel.findById(shift.kasir_id)
+  const modal = kasirRecord ? Number(kasirRecord.modal) : 0
+
+  return {
+    shift_id: shiftId,
+    kasir_username: shift.kasir_username,
+    modal,
+    total_sales: totalSales,
+    expected_cash: modal + totalSales,
+  }
 }
 
 exports.getByShift = async (shiftId) => {
